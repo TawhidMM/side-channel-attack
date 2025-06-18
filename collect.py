@@ -23,7 +23,7 @@ WEBSITES = [
     "https://prothomalo.com",
 ]
 
-TRACES_PER_SITE = 1000
+TRACES_PER_SITE = 1
 FINGERPRINTING_URL = "http://localhost:5000" 
 OUTPUT_PATH = "dataset.json"
 
@@ -75,7 +75,7 @@ def retrieve_traces_from_backend(driver):
 
 def clear_trace_results(driver, wait):
     """Clear all results from the backend by pressing the button."""
-    clear_button = driver.find_element(By.XPATH, "//button[contains(text(), 'Clear all results')]")
+    clear_button = driver.find_element(By.XPATH, "//button[contains(text(), 'Clear All Results')]")
     clear_button.click()
 
     wait.until(EC.text_to_be_present_in_element(
@@ -91,17 +91,70 @@ def is_collection_complete():
 """
 Your implementation starts here.
 """
+def interact_with_website(driver, website_url):
+    """Interact with the website to trigger fingerprinting."""
+    try:
+        # Open the target website in a new tab
+        driver.execute_script("window.open('');")
+        driver.switch_to.window(driver.window_handles[-1])
+        driver.get(website_url)
+        print("  - Opened target website")
+
+        # Interact with the target website (simple scroll as a sample interaction)
+        time.sleep(3)
+        driver.execute_script("window.scrollTo(0, document.body.scrollHeight);")
+        time.sleep(2)
+        driver.execute_script("window.scrollTo(0, 0);")
+        print("  - Interacted with the website")
+
+        # Close the tab and switch back
+        driver.close()
+        driver.switch_to.window(driver.window_handles[0])
+        print("  - Switched back to fingerprinting tab")
+
+    except Exception as e:
+        print("  [!] Error during trace collection:", e)
+        traceback.print_exc()
+
 
 def collect_single_trace(driver, wait, website_url):
-    """ Implement the trace collection logic here. 
-    1. Open the fingerprinting website
-    2. Click the button to collect trace
-    3. Open the target website in a new tab
-    4. Interact with the target website (scroll, click, etc.)
-    5. Return to the fingerprinting tab and close the target website tab
-    6. Wait for the trace to be collected
-    7. Return success or failure status
-    """
+    try:
+        print(f"[+] Collecting trace for: {website_url}")
+
+        # Step 1: Open the fingerprinting website
+        driver.get(FINGERPRINTING_URL)
+        time.sleep(1)
+
+        # Step 2: Click the "Collect Trace Data" button
+        collect_button = wait.until(
+            EC.element_to_be_clickable((By.XPATH, "//button[contains(text(), 'Collect Trace Data')]"))
+        )
+        collect_button.click()
+        print("  - Started trace collection")
+
+        # step 3: interact with the website to collect traces
+        interact_with_website(driver, website_url)
+
+        # Step 6: Wait for the alert or status text indicating completion
+        wait.until(EC.text_to_be_present_in_element(
+            (By.XPATH, "//div[@role='alert']"), "Trace collected successfully")
+        )
+        print("  - Trace collection complete")
+
+        # Step 7: Fetch the newly collected trace from the backend
+        traces = retrieve_traces_from_backend(driver)
+        if traces:
+            # database.db.add_trace(website_url, traces[-1])  # Add last trace only
+            return True
+        else:
+            print("  - No new traces found.")
+            return False
+
+    except Exception as e:
+        print("  [!] Error during trace collection:", e)
+        traceback.print_exc()
+        return False
+
 
 def collect_fingerprints(driver, target_counts=None):
     """ Implement the main logic to collect fingerprints.

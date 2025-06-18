@@ -1,10 +1,13 @@
 import base64
 import io
+import os
+
 import numpy as np
 from flask import Flask, send_from_directory, request, jsonify
 from matplotlib import pyplot as plt
-import os
+from pathlib import Path
 import uuid
+import shutil
 
 # additional imports
 
@@ -12,6 +15,7 @@ app = Flask(__name__)
 
 stored_traces = []
 stored_heatmaps = []
+HEATMAP_DIR = 'heatmaps'
 
 @app.route('/')
 def index():
@@ -38,30 +42,25 @@ def collect_trace():
         if not trace:
             return jsonify({'error': 'Missing trace data'}), 400
 
-        # stored_traces.append(trace)
+        stored_traces.append(trace)
 
-        # Convert trace into a 2D histogram
-        # trace_np = np.array(trace)
-        trace_array = np.array(trace).reshape(1, -1)  # Shape: (1, N)
+        trace_array = np.array(trace).reshape(1, -1)
 
-        fig, ax = plt.subplots(figsize=(12, 1.5))  # Wide and short
+        fig, ax = plt.subplots(figsize=(12, 1.5))
         cax = ax.imshow(trace_array, cmap='plasma', aspect='auto')
 
         ax.axis('off')
         plt.subplots_adjust(left=0, right=1, top=1, bottom=0)
 
-        # Save to buffer
-        # buf = io.BytesIO()
-        # plt.savefig(buf, format='png')
-        # buf.seek(0)
-        # plt.close(fig)
-
-        save_dir = 'static/heatmaps'
-        os.makedirs(save_dir, exist_ok=True)
+        path = Path("static", HEATMAP_DIR)
+        path.mkdir(parents=True, exist_ok=True)
 
         filename = f"{uuid.uuid4().hex}.png"
-        file_path = os.path.join(save_dir, filename)
+        file_path = Path("static", HEATMAP_DIR, filename)
         plt.savefig(file_path)
+
+        print(f"Heatmap saved to {file_path}")
+        print(f'/static/heatmaps/{filename}')
 
         # Encode image to base64 string to send as JSON
         # encoded_img = base64.b64encode(buf.getvalue()).decode('utf-8')
@@ -90,9 +89,31 @@ def clear_results():
     1. Clear stored traces and heatmaps
     2. Return success/error message
     """
+    try:
+        global stored_traces, stored_heatmaps
+        stored_traces = []
+        stored_heatmaps = []
+
+
+        if os.path.exists(HEATMAP_DIR):
+            shutil.rmtree(HEATMAP_DIR)
+
+        return jsonify({'message': 'Results cleared successfully'}), 200
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
 
 
 # Additional endpoints can be implemented here as needed.
+@app.route('/api/get_results', methods=['POST'])
+def get_results():
+    try:
+        return jsonify({
+            'traces': stored_traces,
+        }), 200
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
 
 if __name__ == '__main__':
     app.run(debug=True, host='0.0.0.0', port=5000)

@@ -76,6 +76,7 @@ function app() {
         }));
         this.status = "Trace data collected and visualized using matplotlib";
 
+        console.log(this.traceData);
         worker.terminate();
 
         try {
@@ -95,7 +96,7 @@ function app() {
                     min: min,
                     range: range
                 });
-                this.status = 'Trace collected successfully.';
+                this.status = 'Trace collected successfully';
                 this.showingTraces = true;
             } else {
                 this.status = result.error || 'Failed to collect trace.';
